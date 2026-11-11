@@ -131,6 +131,26 @@ async function runTests() {
   console.log(res4.diagnostics?.formattedMarkdown);
   console.log('-------------------------------------------------\n');
 
+  // --- Test 5: Wide Diagram High-Resolution Rendering (>300px) ---
+  console.log('\n5. Testing Wide Diagram High-Resolution Rendering (>1000px)...');
+  const wideSyntax = `graph LR
+    A[Step 1: Ingestion] --> B[Step 2: Validation] --> C[Step 3: Processing] --> D[Step 4: Storage] --> E[Step 5: Notification] --> F[Step 6: Complete]`;
+
+  const wideOutput = path.join(outputDir, 'wide-flowchart.png');
+  const res5 = await renderer.renderToPng({
+    mermaidSyntax: wideSyntax,
+    outputPath: wideOutput,
+    scale: 2,
+  });
+
+  assert(res5.success === true, 'Wide flowchart renders successfully');
+  assert(typeof res5.width === 'number' && res5.width > 800, `Natural width is preserved (${res5.width}px > 800px, not clamped to 300px)`);
+  if (res5.pngBuffer) {
+    const physW = res5.pngBuffer.readUInt32BE(16);
+    const physH = res5.pngBuffer.readUInt32BE(20);
+    assert(physW >= 1600, `Physical PNG width is sharp retina resolution (${physW}px >= 1600px at 2x scale)`);
+  }
+
   // Clean up
   await renderer.close();
 

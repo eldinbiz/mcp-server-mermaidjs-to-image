@@ -40,6 +40,7 @@ async function testMcpStdio() {
   const renderCall = (await client.callTool({
     name: 'render_mermaid_to_png',
     arguments: {
+      diagram_type: 'flowchart',
       mermaid_syntax: 'graph LR\n  Client[AI Client] -->|stdio| Server[MCP Server]',
       theme: 'neutral',
       scale: 2,

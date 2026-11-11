@@ -1,4 +1,4 @@
-# mcp-mermaidjs-to-image (v0.1.0)
+# mcp-mermaidjs-to-image (v0.2.0)
 
 A high-performance **Model Context Protocol (MCP)** server that converts **Mermaid.js** diagram syntax into crisp, high-resolution **PNG** images. 
 
