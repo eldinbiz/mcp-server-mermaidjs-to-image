@@ -200,8 +200,8 @@ export class MermaidRenderer {
       theme = 'default',
       background = 'white',
       scale = 2,
-      width = 1200,
-      height = 800,
+      width,
+      height,
     } = options;
 
     const effectiveSyntax = normalizeSyntaxHeader(mermaidSyntax, diagramType);
@@ -212,10 +212,12 @@ export class MermaidRenderer {
     try {
       page = await browser.newPage();
 
-      // Configure viewport with requested DPI scale
+      // Configure initial viewport with requested DPI scale
+      const initViewportWidth = width ? Math.max(100, Math.floor(width)) : 1200;
+      const initViewportHeight = height ? Math.max(100, Math.floor(height)) : 800;
       await page.setViewport({
-        width: Math.max(100, Math.floor(width)),
-        height: Math.max(100, Math.floor(height)),
+        width: initViewportWidth,
+        height: initViewportHeight,
         deviceScaleFactor: scale,
       });
 
@@ -258,7 +260,7 @@ export class MermaidRenderer {
 
       // Evaluate parsing and rendering in the browser context
       const evalResult = await page.evaluate(
-        async (syntax: string, activeTheme: string) => {
+        async (syntax: string, activeTheme: string, reqWidth?: number, reqHeight?: number) => {
           const mermaidObj = (window as any).mermaid;
           if (!mermaidObj) {
             return {
@@ -314,6 +316,60 @@ export class MermaidRenderer {
               return { success: false, error: { message: 'Rendered SVG element not found.' } };
             }
 
+            // Extract natural diagram dimensions from SVG
+            let naturalWidth = 0;
+            let naturalHeight = 0;
+
+            if (svgElement.style.maxWidth) {
+              naturalWidth = parseFloat(svgElement.style.maxWidth);
+            }
+
+            const vb = svgElement.viewBox ? svgElement.viewBox.baseVal : null;
+            if (vb && vb.width > 0 && vb.height > 0) {
+              if (!naturalWidth || naturalWidth <= 0) {
+                naturalWidth = vb.width;
+              }
+              naturalHeight = vb.height * (naturalWidth / vb.width);
+            } else if (!naturalHeight) {
+              const bBox = svgElement.getBBox ? svgElement.getBBox() : null;
+              if (bBox && bBox.height > 0) {
+                naturalHeight = bBox.height;
+                if (!naturalWidth || naturalWidth <= 0) {
+                  naturalWidth = bBox.width;
+                }
+              }
+            }
+
+            // Determine target layout dimensions (honoring explicit width/height if requested)
+            let targetWidth = naturalWidth;
+            let targetHeight = naturalHeight;
+
+            if (reqWidth && reqWidth > 0) {
+              targetWidth = reqWidth;
+              if (naturalWidth > 0 && naturalHeight > 0) {
+                targetHeight = naturalHeight * (reqWidth / naturalWidth);
+              } else if (reqHeight && reqHeight > 0) {
+                targetHeight = reqHeight;
+              }
+            } else if (reqHeight && reqHeight > 0 && naturalHeight > 0) {
+              targetHeight = reqHeight;
+              if (naturalWidth > 0) {
+                targetWidth = naturalWidth * (reqHeight / naturalHeight);
+              }
+            }
+
+            // Fix intrinsic sizing bug:
+            // Override SVG width/height and remove percentage width so it doesn't collapse to 300px
+            if (targetWidth > 0) {
+              svgElement.style.width = targetWidth + 'px';
+              svgElement.style.maxWidth = 'none';
+              svgElement.removeAttribute('width');
+            }
+            if (targetHeight > 0) {
+              svgElement.style.height = targetHeight + 'px';
+              svgElement.removeAttribute('height');
+            }
+
             const rect = svgElement.getBoundingClientRect();
             return {
               success: true,
@@ -332,7 +388,9 @@ export class MermaidRenderer {
           }
         },
         effectiveSyntax,
-        theme
+        theme,
+        width,
+        height
       );
 
       if (!evalResult.success) {
@@ -342,6 +400,23 @@ export class MermaidRenderer {
           diagnostics,
         };
       }
+
+      // Dynamically resize viewport to fit diagram without scrollbars or clipping
+      const padding = 48; // 24px padding on each side of body
+      const neededViewportWidth = Math.max(
+        initViewportWidth,
+        Math.ceil((evalResult.width || 800) + padding)
+      );
+      const neededViewportHeight = Math.max(
+        initViewportHeight,
+        Math.ceil((evalResult.height || 600) + padding)
+      );
+
+      await page.setViewport({
+        width: neededViewportWidth,
+        height: neededViewportHeight,
+        deviceScaleFactor: scale,
+      });
 
       // Take screenshot of the diagram container
       const containerElement = await page.$('#container');

@@ -21,7 +21,7 @@ const renderer = new MermaidRenderer(5); // 5 minutes idle timeout
 const server = new McpServer(
   {
     name: 'mcp-mermaidjs-to-image',
-    version: '0.1.0',
+    version: '0.2.0',
   },
   {
     capabilities: {
