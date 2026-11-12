@@ -18,6 +18,30 @@ export type Theme = z.infer<typeof ThemeEnum>;
 export const LookEnum = z.enum(['classic', 'neo', 'handDrawn']);
 export type Look = z.infer<typeof LookEnum>;
 
+export const DARK_THEMES: ReadonlySet<Theme> = new Set<Theme>([
+  'dark',
+  'neo-dark',
+  'redux-dark',
+  'redux-dark-color',
+]);
+
+export const DEFAULT_DARK_BACKGROUND = '#1e1e2e';
+export const DEFAULT_LIGHT_BACKGROUND = 'white';
+
+/**
+ * Resolves the effective background color based on the requested theme and explicit background option.
+ * Dark themes ("dark", "neo-dark", "redux-dark", "redux-dark-color") default to "#1e1e2e" when no
+ * background is explicitly provided; all other themes default to "white".
+ */
+export function resolveEffectiveBackground(theme?: Theme, background?: string): string {
+  if (background && background.trim().length > 0) {
+    return background.trim();
+  }
+  if (theme && DARK_THEMES.has(theme)) {
+    return DEFAULT_DARK_BACKGROUND;
+  }
+  return DEFAULT_LIGHT_BACKGROUND;
+}
 
 export const GetSupportedDiagramsSchema = z.object({
   category: z
@@ -59,8 +83,7 @@ export const RenderMermaidToPngSchema = z.object({
   background: z
     .string()
     .optional()
-    .default('white')
-    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e")'),
+    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e"). Defaults to "white" for light themes and "#1e1e2e" for dark themes ("dark", "neo-dark", "redux-dark", "redux-dark-color").'),
   scale: z
     .number()
     .positive()
@@ -99,8 +122,7 @@ export const RenderMermaidFileSchema = z.object({
   background: z
     .string()
     .optional()
-    .default('white')
-    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e")'),
+    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e"). Defaults to "white" for light themes and "#1e1e2e" for dark themes ("dark", "neo-dark", "redux-dark", "redux-dark-color").'),
   scale: z
     .number()
     .positive()

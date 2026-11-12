@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { MermaidRenderer } from '../src/renderer.js';
+import { DIAGRAM_CATALOG, getDiagramSyntaxGuide } from '../src/catalog.js';
+import { buildDiagnosticReport } from '../src/diagnostics.js';
+import { resolveEffectiveBackground, DARK_THEMES } from '../src/types.js';
 
 async function runTests() {
   console.log('🧪 Starting Mermaid MCP Renderer Tests...\n');
@@ -182,6 +185,83 @@ async function runTests() {
 
   assert(res7.success === true, 'Diagram renders successfully with handDrawn look');
   assert(fs.existsSync(handDrawnOutput), 'Hand-drawn look PNG file written to disk');
+
+  // --- Test 8: Enhancement 1 - 100% SyntaxGuide Coverage Across All 40 Catalog Entries ---
+  console.log('\n8. Testing 100% SyntaxGuide coverage across all 40 DIAGRAM_CATALOG entries...');
+  let missingGuides: string[] = [];
+  for (const entry of DIAGRAM_CATALOG) {
+    const guideRes = getDiagramSyntaxGuide(entry.canonicalKeyword);
+    const hasAllSections =
+      guideRes.success &&
+      guideRes.content.includes('## Core Syntax Elements') &&
+      guideRes.content.includes('## Common Pitfalls & Mistakes to Avoid') &&
+      guideRes.content.includes('## Minimal Working Example') &&
+      guideRes.content.includes('## Complete Real-World Example') &&
+      !guideRes.content.includes('## Starter Example');
+    if (!hasAllSections) {
+      missingGuides.push(entry.canonicalKeyword);
+    }
+  }
+  assert(
+    missingGuides.length === 0,
+    `All ${DIAGRAM_CATALOG.length} catalog diagram types have full SyntaxGuide objects (missing: ${missingGuides.join(', ') || 'none'})`
+  );
+
+  // --- Test 9: Enhancement 1 - Frontmatter-Aware Diagnostics & Diagram-Specific Hints ---
+  console.log('\n9. Testing frontmatter-aware diagram detection & expanded diagnostic hints...');
+  const frontmatterBrokenSankey = `---
+title: Energy Flow
+---
+%% Leading comment
+sankey-beta
+A --> B`;
+  const diagSankey = buildDiagnosticReport(frontmatterBrokenSankey, 'Parse error on line 6: Expecting CSV');
+  assert(
+    diagSankey.hint.includes('CSV') && diagSankey.hint.includes('sankey-beta'),
+    'detectDiagramType skips YAML frontmatter & comments and returns sankey-beta hint'
+  );
+
+  const diagRadar = buildDiagnosticReport('radar-beta\n  axis A\n  curve c1[10]', 'Parse error on line 3');
+  assert(
+    diagRadar.hint.includes('curly braces'),
+    'getHintForDiagram returns radar-beta specific hint'
+  );
+
+  const diagPeg = buildDiagnosticReport('railroad-peg-beta\n  Expr = Term', 'Parse error on line 2');
+  assert(
+    diagPeg.hint.includes('<-'),
+    'getHintForDiagram returns railroad-peg-beta specific hint'
+  );
+
+  // --- Test 10: Enhancement 2 - Smart Dark-Theme Background Pairing ---
+  console.log('\n10. Testing Smart Dark-Theme Background Pairing...');
+  for (const darkTheme of DARK_THEMES) {
+    assert(
+      resolveEffectiveBackground(darkTheme, undefined) === '#1e1e2e',
+      `resolveEffectiveBackground('${darkTheme}', undefined) defaults to '#1e1e2e'`
+    );
+    assert(
+      resolveEffectiveBackground(darkTheme, 'transparent') === 'transparent',
+      `resolveEffectiveBackground('${darkTheme}', 'transparent') honors explicit override`
+    );
+  }
+  assert(
+    resolveEffectiveBackground('default', undefined) === 'white',
+    `resolveEffectiveBackground('default', undefined) defaults to 'white'`
+  );
+  assert(
+    resolveEffectiveBackground('neo', undefined) === 'white',
+    `resolveEffectiveBackground('neo', undefined) defaults to 'white'`
+  );
+
+  const autoDarkOutput = path.join(outputDir, 'auto-dark-bg.png');
+  const resAutoDark = await renderer.renderToPng({
+    mermaidSyntax: flowchartSyntax,
+    outputPath: autoDarkOutput,
+    theme: 'redux-dark',
+    scale: 1,
+  });
+  assert(resAutoDark.success === true, 'redux-dark theme renders with omitted background');
 
   // Clean up
   await renderer.close();

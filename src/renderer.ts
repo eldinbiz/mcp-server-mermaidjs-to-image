@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { RenderResult, Theme, Look } from './types.js';
+import { RenderResult, Theme, Look, resolveEffectiveBackground } from './types.js';
 import { buildDiagnosticReport } from './diagnostics.js';
 
 const require = createRequire(import.meta.url);
@@ -200,12 +200,13 @@ export class MermaidRenderer {
       outputPath,
       theme,
       look,
-      background = 'white',
+      background,
       scale = 2,
       width,
       height,
     } = options;
 
+    const effectiveBackground = resolveEffectiveBackground(theme, background);
     const effectiveSyntax = normalizeSyntaxHeader(mermaidSyntax, diagramType);
 
     const browser = await this.getBrowser();
@@ -223,8 +224,8 @@ export class MermaidRenderer {
         deviceScaleFactor: scale,
       });
 
-      const isTransparent = background.toLowerCase() === 'transparent';
-      const bodyBgColor = isTransparent ? 'transparent' : background;
+      const isTransparent = effectiveBackground.toLowerCase() === 'transparent';
+      const bodyBgColor = isTransparent ? 'transparent' : effectiveBackground;
 
       // Prepare basic HTML scaffold
       const html = `<!DOCTYPE html>

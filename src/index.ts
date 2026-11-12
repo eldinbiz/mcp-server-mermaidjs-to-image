@@ -8,6 +8,7 @@ import {
   RenderMermaidFileSchema,
   GetSupportedDiagramsSchema,
   GetDiagramSyntaxGuideSchema,
+  resolveEffectiveBackground,
 } from './types.js';
 import {
   MERMAID_VERSION,
@@ -21,7 +22,7 @@ const renderer = new MermaidRenderer(5); // 5 minutes idle timeout
 const server = new McpServer(
   {
     name: 'mcp-mermaidjs-to-image',
-    version: '0.2.1',
+    version: '0.2.2',
   },
   {
     capabilities: {
@@ -90,13 +91,14 @@ server.tool(
     }
 
     // 2. Render diagram with normalized diagramType
+    const effectiveBackground = resolveEffectiveBackground(args.theme, args.background);
     const result = await renderer.renderToPng({
       mermaidSyntax: args.mermaid_syntax,
       diagramType: validation.canonicalKeyword,
       outputPath: args.output_path,
       theme: args.theme,
       look: args.look,
-      background: args.background,
+      background: effectiveBackground,
       scale: args.scale,
       width: args.width,
       height: args.height,
@@ -124,7 +126,7 @@ server.tool(
       `- **DPI Scale**: ${args.scale ?? 2}x`,
       ...(args.theme ? [`- **Theme**: \`${args.theme}\``] : []),
       ...(args.look ? [`- **Look**: \`${args.look}\``] : []),
-      `- **Background**: \`${args.background ?? 'white'}\``,
+      `- **Background**: \`${effectiveBackground}\``,
     ];
 
     if (result.outputPath) {
@@ -197,13 +199,14 @@ server.tool(
       };
     }
 
+    const effectiveBackground = resolveEffectiveBackground(args.theme, args.background);
     const result = await renderer.renderToPng({
       mermaidSyntax: syntax,
       diagramType: validation.canonicalKeyword,
       outputPath: args.output_path,
       theme: args.theme,
       look: args.look,
-      background: args.background,
+      background: effectiveBackground,
       scale: args.scale,
       width: args.width,
       height: args.height,
@@ -232,6 +235,7 @@ server.tool(
       `- **DPI Scale**: ${args.scale ?? 2}x`,
       ...(args.theme ? [`- **Theme**: \`${args.theme}\``] : []),
       ...(args.look ? [`- **Look**: \`${args.look}\``] : []),
+      `- **Background**: \`${effectiveBackground}\``,
     ];
 
     return {
