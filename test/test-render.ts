@@ -151,6 +151,38 @@ async function runTests() {
     assert(physW >= 1600, `Physical PNG width is sharp retina resolution (${physW}px >= 1600px at 2x scale)`);
   }
 
+  // --- Test 6: Modern Theme (redux-color) & Look (neo) ---
+  console.log('\n6. Testing Modern Theme (redux-color) with Neo Look...');
+  const neoSyntax = `flowchart LR
+    A[Start] --> B{Process}
+    B -->|Option 1| C[Redux Result]
+    B -->|Option 2| D[Alternative]`;
+
+  const neoOutput = path.join(outputDir, 'neo-redux-color.png');
+  const res6 = await renderer.renderToPng({
+    mermaidSyntax: neoSyntax,
+    outputPath: neoOutput,
+    theme: 'redux-color',
+    look: 'neo',
+    scale: 2,
+  });
+
+  assert(res6.success === true, 'Diagram renders successfully with redux-color theme and neo look');
+  assert(fs.existsSync(neoOutput), 'Neo look PNG file written to disk');
+
+  // --- Test 7: Hand-Drawn Look ---
+  console.log('\n7. Testing Hand-Drawn Look (RoughJS style)...');
+  const handDrawnOutput = path.join(outputDir, 'hand-drawn.png');
+  const res7 = await renderer.renderToPng({
+    mermaidSyntax: neoSyntax,
+    outputPath: handDrawnOutput,
+    look: 'handDrawn',
+    scale: 2,
+  });
+
+  assert(res7.success === true, 'Diagram renders successfully with handDrawn look');
+  assert(fs.existsSync(handDrawnOutput), 'Hand-drawn look PNG file written to disk');
+
   // Clean up
   await renderer.close();
 

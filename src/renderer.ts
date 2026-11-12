@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { RenderResult, Theme } from './types.js';
+import { RenderResult, Theme, Look } from './types.js';
 import { buildDiagnosticReport } from './diagnostics.js';
 
 const require = createRequire(import.meta.url);
@@ -12,6 +12,7 @@ export interface RenderOptions {
   diagramType?: string;
   outputPath?: string;
   theme?: Theme;
+  look?: Look;
   background?: string;
   scale?: number;
   width?: number;
@@ -197,7 +198,8 @@ export class MermaidRenderer {
       mermaidSyntax,
       diagramType,
       outputPath,
-      theme = 'default',
+      theme,
+      look,
       background = 'white',
       scale = 2,
       width,
@@ -260,7 +262,7 @@ export class MermaidRenderer {
 
       // Evaluate parsing and rendering in the browser context
       const evalResult = await page.evaluate(
-        async (syntax: string, activeTheme: string, reqWidth?: number, reqHeight?: number) => {
+        async (syntax: string, activeTheme?: string, activeLook?: string, reqWidth?: number, reqHeight?: number) => {
           const mermaidObj = (window as any).mermaid;
           if (!mermaidObj) {
             return {
@@ -270,12 +272,18 @@ export class MermaidRenderer {
           }
 
           try {
-            mermaidObj.initialize({
+            const initConfig: any = {
               startOnLoad: false,
-              theme: activeTheme,
               securityLevel: 'loose',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-            });
+            };
+            if (activeTheme) {
+              initConfig.theme = activeTheme;
+            }
+            if (activeLook) {
+              initConfig.look = activeLook;
+            }
+            mermaidObj.initialize(initConfig);
           } catch (initErr: any) {
             return {
               success: false,
@@ -389,6 +397,7 @@ export class MermaidRenderer {
         },
         effectiveSyntax,
         theme,
+        look,
         width,
         height
       );

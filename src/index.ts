@@ -21,7 +21,7 @@ const renderer = new MermaidRenderer(5); // 5 minutes idle timeout
 const server = new McpServer(
   {
     name: 'mcp-mermaidjs-to-image',
-    version: '0.2.0',
+    version: '0.2.1',
   },
   {
     capabilities: {
@@ -95,6 +95,7 @@ server.tool(
       diagramType: validation.canonicalKeyword,
       outputPath: args.output_path,
       theme: args.theme,
+      look: args.look,
       background: args.background,
       scale: args.scale,
       width: args.width,
@@ -121,7 +122,8 @@ server.tool(
       `- **Diagram Type**: \`${validation.canonicalKeyword}\``,
       `- **Dimensions**: ${result.width} × ${result.height} px`,
       `- **DPI Scale**: ${args.scale ?? 2}x`,
-      `- **Theme**: \`${args.theme ?? 'default'}\``,
+      ...(args.theme ? [`- **Theme**: \`${args.theme}\``] : []),
+      ...(args.look ? [`- **Look**: \`${args.look}\``] : []),
       `- **Background**: \`${args.background ?? 'white'}\``,
     ];
 
@@ -200,6 +202,7 @@ server.tool(
       diagramType: validation.canonicalKeyword,
       outputPath: args.output_path,
       theme: args.theme,
+      look: args.look,
       background: args.background,
       scale: args.scale,
       width: args.width,
@@ -227,7 +230,8 @@ server.tool(
       `- **Saved to**: \`${result.outputPath}\``,
       `- **Dimensions**: ${result.width} × ${result.height} px`,
       `- **DPI Scale**: ${args.scale ?? 2}x`,
-      `- **Theme**: \`${args.theme ?? 'default'}\``,
+      ...(args.theme ? [`- **Theme**: \`${args.theme}\``] : []),
+      ...(args.look ? [`- **Look**: \`${args.look}\``] : []),
     ];
 
     return {

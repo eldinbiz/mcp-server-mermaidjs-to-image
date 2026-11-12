@@ -1,4 +1,4 @@
-# mcp-mermaidjs-to-image (v0.2.0)
+# mcp-mermaidjs-to-image
 
 A high-performance **Model Context Protocol (MCP)** server that converts **Mermaid.js** diagram syntax into crisp, high-resolution **PNG** images. 
 
@@ -21,7 +21,7 @@ Compatible with **Antigravity**, **Cline**, **Codex**, **Claude Code**, **Cursor
 - **AI-Optimized Verbose Diagnostics**: If syntax fails, returns actionable diagnostics with line numbers, code frames (`> Line N | ... ^`), and diagram-specific remediation hints with `isError: true` so the AI can self-correct immediately.
 - **Sub-100ms Rendering**: Uses a persistent headless browser singleton with lazy initialization and an automatic 5-minute idle shutdown.
 - **High-DPI Retina Output**: Renders at 2x scale by default (configurable up to 3x or 4x).
-- **Flexible Themes & Backgrounds**: Supports `default`, `neutral`, `dark`, `forest`, and `base` themes, plus solid or transparent backgrounds.
+- **Flexible Themes & Looks**: Full support for all 11 Mermaid themes (`redux-color`, `redux-dark-color`, `redux`, `redux-dark`, `neo`, `neo-dark`, `default`, `neutral`, `dark`, `forest`, `base`) and modern rendering styles (`look: "classic" | "neo" | "handDrawn"`), plus solid or transparent backgrounds.
 - **Zero Cloud Dependencies**: Runs 100% locally with automatic fallback to system Microsoft Edge or Google Chrome if needed.
 
 ---
@@ -95,11 +95,12 @@ Converts Mermaid diagram syntax directly into a high-resolution PNG image.
 | `diagram_type` | `string` | **Yes** | — | Required diagram type keyword (e.g. `"usecase-beta"`, `"swimlane-beta"`, `"sequenceDiagram"`, `"flowchart"`) |
 | `mermaid_syntax` | `string` | **Yes** | — | The Mermaid diagram code (e.g. `usecase-beta\n  actor User`) |
 | `output_path` | `string` | No | `undefined` | Optional file path where the PNG will be saved on disk |
-| `theme` | `string` | No | `"default"` | Visual theme: `"default"`, `"neutral"`, `"dark"`, `"forest"`, `"base"` |
+| `theme` | `string` | No | Engine default | Visual theme: `"default"`, `"neutral"`, `"dark"`, `"forest"`, `"base"`, `"neo"`, `"neo-dark"`, `"redux"`, `"redux-dark"`, `"redux-color"`, `"redux-dark-color"` |
+| `look` | `string` | No | Engine default | Visual rendering look: `"classic"` (standard crisp lines), `"neo"` (modern flat style with rounded corners and subtle drop shadows), or `"handDrawn"` (sketch-like rough hand-drawn aesthetic) |
 | `background` | `string` | No | `"white"` | Background color: `"white"`, `"transparent"`, or hex code (`"#1e1e2e"`) |
 | `scale` | `number` | No | `2` | Resolution scale factor (1 for standard, 2 for retina, 3 for ultra-crisp) |
-| `width` | `number` | No | `1200` | Viewport width hint in pixels |
-| `height` | `number` | No | `800` | Viewport height hint in pixels |
+| `width` | `number` | No | Auto | Viewport width hint in pixels |
+| `height` | `number` | No | Auto | Viewport height hint in pixels |
 
 #### Output:
 - `image`: Base64-encoded `image/png` buffer for inline AI inspection.
@@ -117,9 +118,12 @@ Reads a local `.mmd` or `.mermaid` file and renders it directly to a PNG file on
 | `diagram_type` | `string` | **Yes** | — | Required diagram type keyword |
 | `input_path` | `string` | **Yes** | — | Path to source `.mmd` or `.mermaid` file |
 | `output_path` | `string` | **Yes** | — | Destination path for the `.png` file |
-| `theme` | `string` | No | `"default"` | Visual theme |
+| `theme` | `string` | No | Engine default | Visual theme: `"default"`, `"neutral"`, `"dark"`, `"forest"`, `"base"`, `"neo"`, `"neo-dark"`, `"redux"`, `"redux-dark"`, `"redux-color"`, `"redux-dark-color"` |
+| `look` | `string` | No | Engine default | Visual rendering look: `"classic"`, `"neo"`, or `"handDrawn"` |
 | `background` | `string` | No | `"white"` | Background color |
 | `scale` | `number` | No | `2` | Resolution scale factor |
+| `width` | `number` | No | Auto | Viewport width hint in pixels |
+| `height` | `number` | No | Auto | Viewport height hint in pixels |
 
 ---
 
