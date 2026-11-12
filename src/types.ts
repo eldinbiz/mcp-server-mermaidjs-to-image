@@ -1,7 +1,23 @@
 import { z } from 'zod';
 
-export const ThemeEnum = z.enum(['default', 'neutral', 'dark', 'forest', 'base']);
+export const ThemeEnum = z.enum([
+  'default',
+  'neutral',
+  'dark',
+  'forest',
+  'base',
+  'neo',
+  'neo-dark',
+  'redux',
+  'redux-dark',
+  'redux-color',
+  'redux-dark-color',
+]);
 export type Theme = z.infer<typeof ThemeEnum>;
+
+export const LookEnum = z.enum(['classic', 'neo', 'handDrawn']);
+export type Look = z.infer<typeof LookEnum>;
+
 
 export const GetSupportedDiagramsSchema = z.object({
   category: z
@@ -36,8 +52,10 @@ export const RenderMermaidToPngSchema = z.object({
     .optional()
     .describe('Optional absolute or relative file path to save the resulting PNG image to disk'),
   theme: ThemeEnum.optional()
-    .default('default')
-    .describe('Visual theme for the Mermaid diagram: default, neutral, dark, forest, or base'),
+    .describe('Visual theme: default, neutral, dark, forest, base, neo, neo-dark, redux, redux-dark, redux-color, or redux-dark-color'),
+  look: LookEnum.optional()
+    .describe('Visual rendering look style: "classic" (standard clean lines), "neo" (modern flat style with rounded corners and subtle shadows), or "handDrawn" (sketch-like rough hand-drawn aesthetic)'),
+
   background: z
     .string()
     .optional()
@@ -74,8 +92,10 @@ export const RenderMermaidFileSchema = z.object({
     .string()
     .describe('Absolute or relative path where the rendered PNG image should be saved'),
   theme: ThemeEnum.optional()
-    .default('default')
-    .describe('Visual theme for the Mermaid diagram: default, neutral, dark, forest, or base'),
+    .describe('Visual theme: default, neutral, dark, forest, base, neo, neo-dark, redux, redux-dark, redux-color, or redux-dark-color'),
+  look: LookEnum.optional()
+    .describe('Visual rendering look style: "classic" (standard clean lines), "neo" (modern flat style with rounded corners and subtle shadows), or "handDrawn" (sketch-like rough hand-drawn aesthetic)'),
+
   background: z
     .string()
     .optional()

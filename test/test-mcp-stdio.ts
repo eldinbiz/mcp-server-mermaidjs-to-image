@@ -42,7 +42,8 @@ async function testMcpStdio() {
     arguments: {
       diagram_type: 'flowchart',
       mermaid_syntax: 'graph LR\n  Client[AI Client] -->|stdio| Server[MCP Server]',
-      theme: 'neutral',
+      theme: 'redux-color',
+      look: 'neo',
       scale: 2,
     },
   })) as any;
