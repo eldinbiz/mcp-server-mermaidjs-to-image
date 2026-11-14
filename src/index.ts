@@ -8,6 +8,7 @@ import {
   RenderMermaidFileSchema,
   GetSupportedDiagramsSchema,
   GetDiagramSyntaxGuideSchema,
+  resolveEffectiveBackground,
 } from './types.js';
 import {
   MERMAID_VERSION,
@@ -21,7 +22,7 @@ const renderer = new MermaidRenderer(5); // 5 minutes idle timeout
 const server = new McpServer(
   {
     name: 'mcp-mermaidjs-to-image',
-    version: '0.2.1',
+    version: '0.3.0',
   },
   {
     capabilities: {
@@ -33,9 +34,10 @@ const server = new McpServer(
 // Tool 1: get_supported_diagrams
 server.tool(
   'get_supported_diagrams',
-  'Returns the Mermaid.js engine version (v12.3.0) and the full catalog of all 37+ supported diagram types, keywords, aliases, and categories. Pointers guide the AI to query get_diagram_syntax_guide for deep syntax rules.',
+  'Returns the Mermaid.js engine version (v12.3.0) and the full catalog of all 40 supported diagram types, keywords, aliases, and categories. Pointers guide the AI to query get_diagram_syntax_guide for deep syntax rules.',
   GetSupportedDiagramsSchema.shape,
   async (args) => {
+    void renderer.prewarm();
     const summary = getSupportedDiagramsSummary(args.category, args.query);
     return {
       content: [
@@ -54,6 +56,7 @@ server.tool(
   'Returns authoritative syntax rules, keyword requirements, relationship connectors, common pitfalls, and verified working examples for a specific diagram type (e.g. "usecase-beta", "swimlane-beta", "sequenceDiagram", "architecture", "flowchart").',
   GetDiagramSyntaxGuideSchema.shape,
   async (args) => {
+    void renderer.prewarm();
     const result = getDiagramSyntaxGuide(args.diagram_type);
     return {
       isError: !result.success,
@@ -70,7 +73,7 @@ server.tool(
 // Tool 3: render_mermaid_to_png
 server.tool(
   'render_mermaid_to_png',
-  'Renders Mermaid.js diagram syntax into a high-resolution PNG image. Requires an explicit diagram_type keyword (e.g. "usecase-beta", "swimlane-beta", "sequenceDiagram", "flowchart"). Rejects requests if diagram_type is missing or invalid, returning valid keyword feedback.',
+  'Renders Mermaid.js diagram syntax into a high-resolution PNG image. Requires an explicit diagram_type keyword (e.g. "usecase-beta", "swimlane-beta", "sequenceDiagram", "flowchart"). Supports configurable theme, look, background, canvas padding (0-128px, default 24px), DPI scale, and width/height hints. Rejects requests if diagram_type is missing or invalid, returning valid keyword feedback.',
   RenderMermaidToPngSchema.shape,
   async (args) => {
     // 1. Mandatory keyword validation
@@ -90,13 +93,15 @@ server.tool(
     }
 
     // 2. Render diagram with normalized diagramType
+    const effectiveBackground = resolveEffectiveBackground(args.theme, args.background);
     const result = await renderer.renderToPng({
       mermaidSyntax: args.mermaid_syntax,
       diagramType: validation.canonicalKeyword,
       outputPath: args.output_path,
       theme: args.theme,
       look: args.look,
-      background: args.background,
+      background: effectiveBackground,
+      padding: args.padding,
       scale: args.scale,
       width: args.width,
       height: args.height,
@@ -124,7 +129,11 @@ server.tool(
       `- **DPI Scale**: ${args.scale ?? 2}x`,
       ...(args.theme ? [`- **Theme**: \`${args.theme}\``] : []),
       ...(args.look ? [`- **Look**: \`${args.look}\``] : []),
-      `- **Background**: \`${args.background ?? 'white'}\``,
+      `- **Background**: \`${effectiveBackground}\``,
+      `- **Padding**: ${result.padding ?? args.padding ?? 24} px`,
+      ...(typeof result.renderTimeMs === 'number'
+        ? [`- **Render Time**: ${result.renderTimeMs} ms${result.cacheHit ? ' (cache hit)' : ''}`]
+        : []),
     ];
 
     if (result.outputPath) {
@@ -150,7 +159,7 @@ server.tool(
 // Tool 4: render_mermaid_file
 server.tool(
   'render_mermaid_file',
-  'Reads a local .mmd or .mermaid file, validates the mandatory diagram_type, renders it into a high-resolution PNG image, and writes the output file to disk.',
+  'Reads a local .mmd or .mermaid file, validates the mandatory diagram_type, renders it into a high-resolution PNG image, and writes the output file to disk. Supports configurable theme, look, background, canvas padding (0-128px, default 24px), DPI scale, and width/height hints.',
   RenderMermaidFileSchema.shape,
   async (args) => {
     // 1. Mandatory keyword validation
@@ -197,13 +206,15 @@ server.tool(
       };
     }
 
+    const effectiveBackground = resolveEffectiveBackground(args.theme, args.background);
     const result = await renderer.renderToPng({
       mermaidSyntax: syntax,
       diagramType: validation.canonicalKeyword,
       outputPath: args.output_path,
       theme: args.theme,
       look: args.look,
-      background: args.background,
+      background: effectiveBackground,
+      padding: args.padding,
       scale: args.scale,
       width: args.width,
       height: args.height,
@@ -232,6 +243,11 @@ server.tool(
       `- **DPI Scale**: ${args.scale ?? 2}x`,
       ...(args.theme ? [`- **Theme**: \`${args.theme}\``] : []),
       ...(args.look ? [`- **Look**: \`${args.look}\``] : []),
+      `- **Background**: \`${effectiveBackground}\``,
+      `- **Padding**: ${result.padding ?? args.padding ?? 24} px`,
+      ...(typeof result.renderTimeMs === 'number'
+        ? [`- **Render Time**: ${result.renderTimeMs} ms${result.cacheHit ? ' (cache hit)' : ''}`]
+        : []),
     ];
 
     return {

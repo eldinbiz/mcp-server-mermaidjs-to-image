@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { DIAGRAM_CATALOG } from '../src/catalog.js';
 
 async function runTestSuite() {
   console.log('🧪 Starting MCP Tools Test Suite...');
@@ -147,7 +148,103 @@ Ship --> Receive`;
   }
   console.log('✅ Test 6 Passed: Successfully rendered native Swimlanes diagram to PNG.');
 
-  console.log('\n🎉 ALL 6 TESTS PASSED SUCCESSFULLY!');
+  // Test 7: Verify get_diagram_syntax_guide returns full guides for all 40 catalog entries
+  console.log('\n--- Test 7: Verify Full Syntax Guides for All 40 Catalog Diagram Types ---');
+  for (const entry of DIAGRAM_CATALOG) {
+    const res = (await client.callTool({
+      name: 'get_diagram_syntax_guide',
+      arguments: { diagram_type: entry.canonicalKeyword },
+    })) as any;
+    const text = res.content?.[0]?.text || '';
+    if (
+      res.isError ||
+      !text.includes('## Core Syntax Elements') ||
+      !text.includes('## Common Pitfalls & Mistakes to Avoid') ||
+      !text.includes('## Minimal Working Example') ||
+      !text.includes('## Complete Real-World Example')
+    ) {
+      throw new Error(`Incomplete syntax guide returned for ${entry.canonicalKeyword}`);
+    }
+  }
+  console.log(`✅ Test 7 Passed: All ${DIAGRAM_CATALOG.length} diagram types return rich, complete syntax guides.`);
+
+  // Test 8: Verify Smart Dark-Theme Background Pairing via MCP Tool
+  console.log('\n--- Test 8: Smart Dark-Theme Background Pairing ---');
+  const darkRenderRes = (await client.callTool({
+    name: 'render_mermaid_to_png',
+    arguments: {
+      diagram_type: 'flowchart',
+      mermaid_syntax: 'flowchart LR\n  A[Dark Theme] --> B[Auto #1e1e2e Background]',
+      theme: 'dark',
+    },
+  })) as any;
+  const darkMetaText = darkRenderRes.content?.find((c: any) => c.type === 'text')?.text || '';
+  if (darkRenderRes.isError || !darkMetaText.includes('- **Background**: `#1e1e2e`')) {
+    throw new Error(`Expected dark theme with omitted background to auto-pair with #1e1e2e, got:\n${darkMetaText}`);
+  }
+
+  const lightRenderRes = (await client.callTool({
+    name: 'render_mermaid_to_png',
+    arguments: {
+      diagram_type: 'flowchart',
+      mermaid_syntax: 'flowchart LR\n  A[Light Theme] --> B[Default white Background]',
+      theme: 'default',
+    },
+  })) as any;
+  const lightMetaText = lightRenderRes.content?.find((c: any) => c.type === 'text')?.text || '';
+  if (lightRenderRes.isError || !lightMetaText.includes('- **Background**: `white`')) {
+    throw new Error(`Expected light theme with omitted background to default to white, got:\n${lightMetaText}`);
+  }
+
+  const overrideRenderRes = (await client.callTool({
+    name: 'render_mermaid_to_png',
+    arguments: {
+      diagram_type: 'flowchart',
+      mermaid_syntax: 'flowchart LR\n  A[Dark Theme] --> B[Explicit Transparent]',
+      theme: 'neo-dark',
+      background: 'transparent',
+    },
+  })) as any;
+  const overrideMetaText = overrideRenderRes.content?.find((c: any) => c.type === 'text')?.text || '';
+  if (overrideRenderRes.isError || !overrideMetaText.includes('- **Background**: `transparent`')) {
+    throw new Error(`Expected explicit background override to be honored, got:\n${overrideMetaText}`);
+  }
+  console.log('✅ Test 8 Passed: Smart Dark-Theme Background Pairing works as expected.');
+
+  // Test 9: Verify configurable padding, renderTimeMs telemetry, and cache hits via MCP
+  console.log('\n--- Test 9: Padding Parameter, Render Time Telemetry & Cache Hit ---');
+  const padCall1 = (await client.callTool({
+    name: 'render_mermaid_to_png',
+    arguments: {
+      diagram_type: 'flowchart',
+      mermaid_syntax: 'flowchart LR\n  M1[Padding & Cache] --> M2[Fast Response]',
+      padding: 8,
+    },
+  })) as any;
+  const padText1 = padCall1.content?.find((c: any) => c.type === 'text')?.text || '';
+  if (
+    padCall1.isError ||
+    !padText1.includes('- **Padding**: 8 px') ||
+    !padText1.includes('- **Render Time**:')
+  ) {
+    throw new Error(`Expected Padding: 8 px and Render Time telemetry in output, got:\n${padText1}`);
+  }
+
+  const padCall2 = (await client.callTool({
+    name: 'render_mermaid_to_png',
+    arguments: {
+      diagram_type: 'flowchart',
+      mermaid_syntax: 'flowchart LR\n  M1[Padding & Cache] --> M2[Fast Response]',
+      padding: 8,
+    },
+  })) as any;
+  const padText2 = padCall2.content?.find((c: any) => c.type === 'text')?.text || '';
+  if (padCall2.isError || !padText2.includes('(cache hit)')) {
+    throw new Error(`Expected repeat MCP call to report (cache hit), got:\n${padText2}`);
+  }
+  console.log('✅ Test 9 Passed: Configurable padding, Render Time telemetry, and LRU cache hit verified over MCP.');
+
+  console.log('\n🎉 ALL 9 TESTS PASSED SUCCESSFULLY!');
   process.exit(0);
 }
 

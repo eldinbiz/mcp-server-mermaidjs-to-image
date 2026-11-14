@@ -18,6 +18,42 @@ export type Theme = z.infer<typeof ThemeEnum>;
 export const LookEnum = z.enum(['classic', 'neo', 'handDrawn']);
 export type Look = z.infer<typeof LookEnum>;
 
+export const DARK_THEMES: ReadonlySet<Theme> = new Set<Theme>([
+  'dark',
+  'neo-dark',
+  'redux-dark',
+  'redux-dark-color',
+]);
+
+export const DEFAULT_DARK_BACKGROUND = '#1e1e2e';
+export const DEFAULT_LIGHT_BACKGROUND = 'white';
+export const DEFAULT_CANVAS_PADDING = 24;
+export const MAX_CANVAS_PADDING = 128;
+
+/**
+ * Resolves the effective background color based on the requested theme and explicit background option.
+ * Dark themes ("dark", "neo-dark", "redux-dark", "redux-dark-color") default to "#1e1e2e" when no
+ * background is explicitly provided; all other themes default to "white".
+ */
+export function resolveEffectiveBackground(theme?: Theme, background?: string): string {
+  if (background && background.trim().length > 0) {
+    return background.trim();
+  }
+  if (theme && DARK_THEMES.has(theme)) {
+    return DEFAULT_DARK_BACKGROUND;
+  }
+  return DEFAULT_LIGHT_BACKGROUND;
+}
+
+/**
+ * Resolves and clamps the outer canvas padding around rendered diagrams (default: 24px, range: 0..128px).
+ */
+export function resolveEffectivePadding(padding?: number): number {
+  if (typeof padding !== 'number' || !Number.isFinite(padding)) {
+    return DEFAULT_CANVAS_PADDING;
+  }
+  return Math.max(0, Math.min(MAX_CANVAS_PADDING, Math.round(padding)));
+}
 
 export const GetSupportedDiagramsSchema = z.object({
   category: z
@@ -59,8 +95,17 @@ export const RenderMermaidToPngSchema = z.object({
   background: z
     .string()
     .optional()
-    .default('white')
-    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e")'),
+    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e"). Defaults to "white" for light themes and "#1e1e2e" for dark themes ("dark", "neo-dark", "redux-dark", "redux-dark-color").'),
+  padding: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_CANVAS_PADDING)
+    .optional()
+    .default(DEFAULT_CANVAS_PADDING)
+    .describe(
+      'Outer canvas margin around the diagram in CSS pixels (integer 0–128, default: 24). Controls the whitespace border filled with the effective background color. Use 0–8 for tight crops inside slides, UI cards, or compact Markdown tables; keep 24 (default) or 32–48 for comfortable breathing room and to avoid clipping drop shadows (`look: "neo"`) or wide arrowhead markers.'
+    ),
   scale: z
     .number()
     .positive()
@@ -99,8 +144,17 @@ export const RenderMermaidFileSchema = z.object({
   background: z
     .string()
     .optional()
-    .default('white')
-    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e")'),
+    .describe('Background color: "white", "transparent", or any CSS color code (e.g. "#1e1e2e"). Defaults to "white" for light themes and "#1e1e2e" for dark themes ("dark", "neo-dark", "redux-dark", "redux-dark-color").'),
+  padding: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_CANVAS_PADDING)
+    .optional()
+    .default(DEFAULT_CANVAS_PADDING)
+    .describe(
+      'Outer canvas margin around the diagram in CSS pixels (integer 0–128, default: 24). Controls the whitespace border filled with the effective background color. Use 0–8 for tight crops inside slides, UI cards, or compact Markdown tables; keep 24 (default) or 32–48 for comfortable breathing room and to avoid clipping drop shadows (`look: "neo"`) or wide arrowhead markers.'
+    ),
   scale: z
     .number()
     .positive()
@@ -139,5 +193,8 @@ export interface RenderResult {
   outputPath?: string;
   width?: number;
   height?: number;
+  padding?: number;
+  renderTimeMs?: number;
+  cacheHit?: boolean;
   diagnostics?: DiagnosticReport;
 }
