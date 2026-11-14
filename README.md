@@ -19,10 +19,10 @@ Compatible with **Antigravity**, **Cline**, **Codex**, **Claude Code**, **Cursor
 - **Smart Alias Normalization**: Transparently maps aliases (`usecase` / `use-case` → `usecase-beta`, `swimlane` / `swimlanes` → `swimlane-beta`) across arguments and syntax headers.
 - **Multimodal AI Ready**: Returns the rendered diagram directly as an MCP `image/png` block so multimodal AI assistants can visually inspect and verify their diagrams in real time.
 - **AI-Optimized Verbose Diagnostics**: If syntax fails, returns actionable diagnostics with line numbers, code frames (`> Line N | ... ^`), and diagram-specific remediation hints with `isError: true` so the AI can self-correct immediately.
-- **Sub-100ms Rendering**: Uses a persistent headless browser singleton with lazy initialization and an automatic 5-minute idle shutdown.
-- **High-DPI Retina Output**: Renders at 2x scale by default (configurable up to 3x or 4x).
+- **Sub-100ms Pooled Rendering & LRU Cache**: Uses a persistent headless Chromium singleton with opportunistic background pre-warming (on discovery calls), a bounded dynamic warm page pool (`1` idle page, scaling up to `3` under parallel load), and a byte-bounded LRU PNG cache (`50` entries / `32 MB`) for `<1 ms` repeat hits.
+- **High-DPI Retina Output**: Renders at 2x scale by default (configurable up to 3x or 4x) with configurable outer canvas padding (`0`–`128 px`).
 - **Flexible Themes & Looks**: Full support for all 11 Mermaid themes (`redux-color`, `redux-dark-color`, `redux`, `redux-dark`, `neo`, `neo-dark`, `default`, `neutral`, `dark`, `forest`, `base`) and modern rendering styles (`look: "classic" | "neo" | "handDrawn"`), with automatic dark-theme background pairing (`#1e1e2e` for dark themes, `white` for light themes) or custom/transparent overrides.
-- **Zero Cloud Dependencies**: Runs 100% locally with automatic fallback to system Microsoft Edge or Google Chrome if needed.
+- **Zero Cloud Dependencies & Sandbox Hardened**: Runs 100% locally with automatic fallback to system Microsoft Edge or Google Chrome, outbound HTTP/HTTPS request blocking inside Puppeteer tabs, a 30s render watchdog, and raised Mermaid ceilings (`200,000` characters / `2,000` edges).
 
 ---
 
@@ -98,13 +98,14 @@ Converts Mermaid diagram syntax directly into a high-resolution PNG image.
 | `theme` | `string` | No | Engine default | Visual theme: `"default"`, `"neutral"`, `"dark"`, `"forest"`, `"base"`, `"neo"`, `"neo-dark"`, `"redux"`, `"redux-dark"`, `"redux-color"`, `"redux-dark-color"` |
 | `look` | `string` | No | Engine default | Visual rendering look: `"classic"` (standard crisp lines), `"neo"` (modern flat style with rounded corners and subtle drop shadows), or `"handDrawn"` (sketch-like rough hand-drawn aesthetic) |
 | `background` | `string` | No | `"white"` (or `"#1e1e2e"` for dark themes) | Background color: `"white"`, `"transparent"`, or hex code (`"#1e1e2e"`). Automatically pairs with `"#1e1e2e"` when omitted on dark themes (`dark`, `neo-dark`, `redux-dark`, `redux-dark-color`) |
+| `padding` | `number` | No | `24` | Outer canvas margin in CSS pixels (`0`–`128`). Use `0–8` for tight crops inside slides or Markdown tables; keep `24–48` for drop shadows (`look: "neo"`) or wide arrow markers |
 | `scale` | `number` | No | `2` | Resolution scale factor (1 for standard, 2 for retina, 3 for ultra-crisp) |
 | `width` | `number` | No | Auto | Viewport width hint in pixels |
 | `height` | `number` | No | Auto | Viewport height hint in pixels |
 
 #### Output:
 - `image`: Base64-encoded `image/png` buffer for inline AI inspection.
-- `text`: Execution summary with dimensions, scale factor, and saved path.
+- `text`: Execution summary with dimensions, DPI scale, padding, render time (and cache hit status), and saved path.
 
 ---
 
@@ -121,6 +122,7 @@ Reads a local `.mmd` or `.mermaid` file and renders it directly to a PNG file on
 | `theme` | `string` | No | Engine default | Visual theme: `"default"`, `"neutral"`, `"dark"`, `"forest"`, `"base"`, `"neo"`, `"neo-dark"`, `"redux"`, `"redux-dark"`, `"redux-color"`, `"redux-dark-color"` |
 | `look` | `string` | No | Engine default | Visual rendering look: `"classic"`, `"neo"`, or `"handDrawn"` |
 | `background` | `string` | No | `"white"` (or `"#1e1e2e"` for dark themes) | Background color (`"white"`, `"transparent"`, or hex code) |
+| `padding` | `number` | No | `24` | Outer canvas margin in CSS pixels (`0`–`128`) |
 | `scale` | `number` | No | `2` | Resolution scale factor |
 | `width` | `number` | No | Auto | Viewport width hint in pixels |
 | `height` | `number` | No | Auto | Viewport height hint in pixels |
@@ -321,7 +323,10 @@ Available tools: [
 --- Test 8: Smart Dark-Theme Background Pairing ---
 ✅ Test 8 Passed: Smart Dark-Theme Background Pairing works as expected.
 
-🎉 ALL 8 TESTS PASSED SUCCESSFULLY!
+--- Test 9: Padding Parameter, Render Time Telemetry & Cache Hit ---
+✅ Test 9 Passed: Configurable padding, Render Time telemetry, and LRU cache hit verified over MCP.
+
+🎉 ALL 9 TESTS PASSED SUCCESSFULLY!
 ```
 
 ---

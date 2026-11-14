@@ -211,7 +211,40 @@ Ship --> Receive`;
   }
   console.log('✅ Test 8 Passed: Smart Dark-Theme Background Pairing works as expected.');
 
-  console.log('\n🎉 ALL 8 TESTS PASSED SUCCESSFULLY!');
+  // Test 9: Verify configurable padding, renderTimeMs telemetry, and cache hits via MCP
+  console.log('\n--- Test 9: Padding Parameter, Render Time Telemetry & Cache Hit ---');
+  const padCall1 = (await client.callTool({
+    name: 'render_mermaid_to_png',
+    arguments: {
+      diagram_type: 'flowchart',
+      mermaid_syntax: 'flowchart LR\n  M1[Padding & Cache] --> M2[Fast Response]',
+      padding: 8,
+    },
+  })) as any;
+  const padText1 = padCall1.content?.find((c: any) => c.type === 'text')?.text || '';
+  if (
+    padCall1.isError ||
+    !padText1.includes('- **Padding**: 8 px') ||
+    !padText1.includes('- **Render Time**:')
+  ) {
+    throw new Error(`Expected Padding: 8 px and Render Time telemetry in output, got:\n${padText1}`);
+  }
+
+  const padCall2 = (await client.callTool({
+    name: 'render_mermaid_to_png',
+    arguments: {
+      diagram_type: 'flowchart',
+      mermaid_syntax: 'flowchart LR\n  M1[Padding & Cache] --> M2[Fast Response]',
+      padding: 8,
+    },
+  })) as any;
+  const padText2 = padCall2.content?.find((c: any) => c.type === 'text')?.text || '';
+  if (padCall2.isError || !padText2.includes('(cache hit)')) {
+    throw new Error(`Expected repeat MCP call to report (cache hit), got:\n${padText2}`);
+  }
+  console.log('✅ Test 9 Passed: Configurable padding, Render Time telemetry, and LRU cache hit verified over MCP.');
+
+  console.log('\n🎉 ALL 9 TESTS PASSED SUCCESSFULLY!');
   process.exit(0);
 }
 

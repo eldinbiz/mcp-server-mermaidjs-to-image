@@ -90,6 +90,13 @@ export function getHintForDiagram(diagramType: string, errorMessage: string): st
   const lowerMsg = errorMessage.toLowerCase();
   const normType = diagramType.trim().toLowerCase();
 
+  if (lowerMsg.includes('maximum text size')) {
+    return 'Diagram syntax exceeded the server limit of 200,000 characters. Split large specifications into multiple focused sub-diagrams or remove unnecessary verbose comments/styling blocks.';
+  }
+  if (lowerMsg.includes('maximum edges')) {
+    return 'Diagram exceeded the server limit of 2,000 edges. Break complex dependency or architecture graphs into smaller domain-specific views or sub-diagrams for clarity and faster rendering.';
+  }
+
   switch (normType) {
     case 'usecase-beta':
     case 'usecase':

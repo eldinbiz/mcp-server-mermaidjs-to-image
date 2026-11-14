@@ -263,6 +263,146 @@ A --> B`;
   });
   assert(resAutoDark.success === true, 'redux-dark theme renders with omitted background');
 
+  // --- Test 11: Warm Pool State Isolation (no theme/look leakage across renders) ---
+  console.log('\n11. Testing Warm Pool State Isolation across sequential renders...');
+  const isolatedBaseline = await renderer.renderToPng({
+    mermaidSyntax: `flowchart LR\n  X[Alpha] --> Y[Beta]`,
+    scale: 2,
+  });
+  const styledRender = await renderer.renderToPng({
+    mermaidSyntax: `flowchart LR\n  X[Alpha] --> Y[Gamma]`,
+    theme: 'dark',
+    look: 'handDrawn',
+    scale: 2,
+  });
+  const afterStyledOmitted = await renderer.renderToPng({
+    mermaidSyntax: `flowchart LR\n  X[Alpha] --> Y[Delta]`,
+    scale: 2,
+  });
+  assert(
+    isolatedBaseline.success && styledRender.success && afterStyledOmitted.success,
+    'Sequential dark+handDrawn and omitted-default renders succeed'
+  );
+  // Compare against a fresh renderer's default+classic render of the same syntax to prove zero state leak
+  const freshRenderer = new MermaidRenderer(1);
+  const freshDefaultCheck = await freshRenderer.renderToPng({
+    mermaidSyntax: `flowchart LR\n  X[Alpha] --> Y[Delta]`,
+    scale: 2,
+  });
+  assert(
+    !!afterStyledOmitted.pngBuffer &&
+      !!freshDefaultCheck.pngBuffer &&
+      afterStyledOmitted.pngBuffer.equals(freshDefaultCheck.pngBuffer),
+    'Warm page resets theme/look cleanly after dark+handDrawn render (exact byte match to clean page)'
+  );
+  await freshRenderer.close();
+
+  // --- Test 12: Bounded Dynamic Pool & Concurrency Safety ---
+  console.log('\n12. Testing Bounded Dynamic Pool under parallel render burst...');
+  const concurrentRenderer = new MermaidRenderer(1);
+  const concurrentTasks = [1, 2, 3, 4].map((idx) =>
+    concurrentRenderer.renderToPng({
+      mermaidSyntax: `flowchart TD\n  N${idx}[Concurrent Node ${idx}] --> D${idx}[Done ${idx}]`,
+      diagramType: 'flowchart',
+      scale: 1,
+    })
+  );
+  const concurrentResults = await Promise.all(concurrentTasks);
+  const concurrentStats = concurrentRenderer.getPoolStats();
+  assert(
+    concurrentResults.every((r) => r.success && !!r.pngBuffer && r.pngBuffer.length > 500),
+    'All 4 concurrent renders succeed without launch or DOM races'
+  );
+  assert(
+    concurrentStats.poolSize >= 2 && concurrentStats.poolSize <= 3 && concurrentStats.inUseCount === 0,
+    `Bounded pool scaled cleanly within 2..3 pages and returned all pages idle (poolSize=${concurrentStats.poolSize}, inUse=${concurrentStats.inUseCount})`
+  );
+  await concurrentRenderer.close();
+
+  // --- Test 13: LRU Cache Hits & Disk Write on Cache Hit ---
+  console.log('\n13. Testing Byte-Bounded LRU Render Cache...');
+  const cacheSyntax = `flowchart LR\n  CacheA[Input] --> CacheB[Output]`;
+  const missRes = await renderer.renderToPng({
+    mermaidSyntax: cacheSyntax,
+    scale: 2,
+  });
+  const cachedDiskPath = path.join(outputDir, 'cached-hit-output.png');
+  if (fs.existsSync(cachedDiskPath)) {
+    fs.unlinkSync(cachedDiskPath);
+  }
+  const hitRes = await renderer.renderToPng({
+    mermaidSyntax: cacheSyntax,
+    outputPath: cachedDiskPath,
+    scale: 2,
+  });
+  assert(missRes.success && missRes.cacheHit === false, 'First render recorded cacheHit=false');
+  assert(hitRes.success && hitRes.cacheHit === true, 'Second identical render recorded cacheHit=true');
+  assert(
+    fs.existsSync(cachedDiskPath) && !!missRes.pngBuffer && !!hitRes.pngBuffer && missRes.pngBuffer.equals(hitRes.pngBuffer),
+    'Cache hit wrote identical PNG buffer to disk at new outputPath'
+  );
+
+  // --- Test 14: Configurable Canvas Padding ---
+  console.log('\n14. Testing Configurable Canvas Padding (0px vs 48px)...');
+  const padSyntax = `flowchart LR\n  P1[Pad Test] --> P2[End]`;
+  const pad0Res = await renderer.renderToPng({
+    mermaidSyntax: padSyntax,
+    padding: 0,
+    scale: 2,
+  });
+  const pad48Res = await renderer.renderToPng({
+    mermaidSyntax: padSyntax,
+    padding: 48,
+    scale: 2,
+  });
+  assert(
+    pad0Res.success && pad48Res.success && pad0Res.padding === 0 && pad48Res.padding === 48,
+    'Configurable padding (0px and 48px) renders successfully and records padding metadata'
+  );
+  if (pad0Res.pngBuffer && pad48Res.pngBuffer) {
+    const w0 = pad0Res.pngBuffer.readUInt32BE(16);
+    const h0 = pad0Res.pngBuffer.readUInt32BE(20);
+    const w48 = pad48Res.pngBuffer.readUInt32BE(16);
+    const h48 = pad48Res.pngBuffer.readUInt32BE(20);
+    assert(
+      w48 - w0 === 96 * 2 && h48 - h0 === 96 * 2,
+      `Physical PNG dimensions grew cleanly by 2*(48-0)*2 = 192px (${w0}x${h0} -> ${w48}x${h48})`
+    );
+  }
+
+  // --- Test 15: HTTP/S Request Blocking & Raised maxEdges (550 edges) ---
+  console.log('\n15. Testing HTTP/S Request Blocking & Large Diagram Limits (>500 edges)...');
+  const blockedNetStart = performance.now();
+  const netBlockedRes = await renderer.renderToPng({
+    mermaidSyntax: `flowchart LR\n  A["<img src='https://127.0.0.1:1/hang.png' width='20' height='20'/> Local HTML Label"] --> B[Fast]`,
+    scale: 1,
+  });
+  const blockedNetElapsed = performance.now() - blockedNetStart;
+  assert(
+    netBlockedRes.success === true && blockedNetElapsed < 3000,
+    `Diagram with external URL finishes rapidly without hanging (${Math.round(blockedNetElapsed)}ms)`
+  );
+
+  // Build a 550-edge flowchart (> default 500 cap, well within raised 2,000 cap)
+  const edgeLines = ['flowchart LR'];
+  for (let i = 0; i < 550; i++) {
+    edgeLines.push(`  N${i % 40} --> N${(i % 40) + 1}`);
+  }
+  const largeEdgesRes = await renderer.renderToPng({
+    mermaidSyntax: edgeLines.join('\n'),
+    scale: 1,
+  });
+  assert(
+    largeEdgesRes.success === true,
+    `550-edge diagram renders successfully using raised maxEdges=2000 limit (time=${largeEdgesRes.renderTimeMs}ms)`
+  );
+
+  const edgeLimitDiag = buildDiagnosticReport('flowchart LR\nA-->B', 'Maximum edges exceeded');
+  assert(
+    edgeLimitDiag.hint.includes('2,000'),
+    'Diagnostic hint reflects raised 2,000-edge limit when exceeded'
+  );
+
   // Clean up
   await renderer.close();
 
